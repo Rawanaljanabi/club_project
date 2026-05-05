@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Club Anniversary</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #141e41;
+            font-family: 'Georgia', serif;
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
+            width: 100%;
+        }
+
+        .join-section {
+            display: block;
+        }
+
+        .message-section {
+            display: none;
+        }
+
+        .inbox-section {
+            display: none;
+        }
+
+        .image-container img {
+            max-width: 250px;
+            height: auto;
+            border-radius: 50%;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        label {
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input[type="text"],
+        textarea {
+            padding: 10px;
+            width: 100%;
+            max-width: 300px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: Arial, sans-serif;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        button {
+            padding: 10px 30px;
+            background-color: #e67e22;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            background-color: #d35400;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .nav-buttons button {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .popup-content {
+            background: white;
+            color: black;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 250px;
+            max-width: 500px;
+        }
+
+        .popup-content button {
+            margin-top: 10px;
+            padding: 8px 20px;
+        }
+
+        .target-name {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .inbox-container {
+            max-height: 500px;
+            overflow-y: auto;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .inbox-message {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #e67e22;
+        }
+
+        .inbox-message .from {
+            color: #e67e22;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .inbox-message .text {
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        .inbox-message .time {
+            color: #bbb;
+            font-size: 0.9rem;
+        }
+
+        .empty-inbox {
+            color: #bbb;
+            padding: 30px;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- JOIN SECTION -->
+        <div class="join-section" id="joinSection">
+            <div class="image-container">
+                <img src="{{ url_for('static', filename='bc.JPG') }}" alt="image">
+            </div>
+
+            <h1>Happy 5th Anniversary!</h1>
+
+            <form onsubmit="submitForm(event)">
+                <label for="user-name">Enter Your Name</label>
+                <input type="text" id="user-name" placeholder="first name only" required>
+                <button type="submit">Submit</button>
+            </form>
+        </div>
+
+        <!-- MESSAGE SECTION -->
+        <div class="message-section" id="messageSection">
+            <h2>Send Your Appreciation! 💝</h2>
+
+            <div class="target-name">
+                Sending appreciation to: <strong id="targetName"></strong>
+            </div>
+
+            <form onsubmit="sendAppreciation(event)">
+                <label for="message">Your Message</label>
+                <textarea id="message" placeholder="Write your appreciation message..." required></textarea>
+                <button type="submit">Send Message</button>
+            </form>
+
+            <div class="nav-buttons">
+                <button onclick="getNewTarget()" style="background-color: #3498db;">
+                    Pick Another Person
+                </button>
+                <button onclick="goToInbox()" style="background-color: #27ae60;">
+                    📬 View Inbox
+                </button>
+            </div>
+        </div>
+
+       <!-- INBOX SECTION -->
+<div class="inbox-section" id="inboxSection">
+    <h2>📬 Appreciation Inbox</h2>
+
+    <div class="inbox-container" id="inboxContainer">
+        <div class="empty-inbox">Loading messages...</div>
+    </div>
+
+    <button onclick="goBackToMessaging()" style="background-color: #3498db; margin-top: 15px;">
+        ← Back to Send Messages
+    </button>
+</div>
+
+    <!-- POPUP -->
+    <div id="popup" class="popup">
+        <div class="popup-content">
+            <p id="popup-text">Loading...</p>
+            <button onclick="closePopup()">OK</button>
+        </div>
+    </div>
+
+    <script>
+     let targetUserId = null;
+let targetUserName = null;
+
+// safe JSON handler
+async function safeJson(res) {
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error("Server returned invalid response");
+    }
+}
+
+function submitForm(event) {
+    event.preventDefault();
+
+    const name = document.getElementById("user-name").value.trim();
+
+    if (!name) {
+        showPopupMessage("Please enter your name!");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("name", name);
+
+    showPopupMessage("Adding you to the club...");
+
+    fetch("/join", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => safeJson(res))
+    .then(data => {
+        if (data.error) throw new Error(data.error);
+
+        showPopupMessage("Picking someone for you...");
+        return fetch("/random-user");
+    })
+    .then(res => safeJson(res))
+    .then(data => {
+        if (data.error) throw new Error(data.error);
+
+        targetUserId = data.id;
+        targetUserName = data.name;
+
+        document.getElementById("targetName").innerText = targetUserName;
+
+        closePopup();
+        document.getElementById("joinSection").style.display = "none";
+        document.getElementById("messageSection").style.display = "block";
+    })
+    .catch(err => {
+        console.error(err);
+        showPopupMessage("❌ " + err.message);
+    });
+}
+
+function sendAppreciation(event) {
+    event.preventDefault();
+
+    const message = document.getElementById("message").value.trim();
+
+    if (!message) {
+        showPopupMessage("Please write a message!");
+        return;
+    }
+
+    fetch("/send-appreciation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            to_user_id: targetUserId,
+            message: message
+        })
+    })
+    .then(res => safeJson(res))
+    .then(data => {
+        if (data.error) throw new Error(data.error);
+
+        showPopupMessage("✨ Message sent to " + targetUserName + " 💝");
+        document.getElementById("message").value = "";
+    })
+    .catch(err => {
+        showPopupMessage("❌ " + err.message);
+    });
+}
+
+function getNewTarget() {
+    showPopupMessage("Picking another person...");
+
+    fetch("/random-user")
+    .then(res => safeJson(res))
+    .then(data => {
+        if (data.error) throw new Error(data.error);
+
+        targetUserId = data.id;
+        targetUserName = data.name;
+
+        document.getElementById("targetName").innerText = targetUserName;
+        document.getElementById("message").value = "";
+
+        closePopup();
+    })
+    .catch(err => showPopupMessage("❌ " + err.message));
+}
+
+function goToInbox() {
+    document.getElementById("messageSection").style.display = "none";
+    document.getElementById("inboxSection").style.display = "block";
+    loadInbox();
+}
+
+function goBackToMessaging() {
+    document.getElementById("inboxSection").style.display = "none";
+    document.getElementById("messageSection").style.display = "block";
+}
+
+function loadInbox() {
+    fetch("/inbox")
+    .then(res => safeJson(res))
+    .then(data => {
+        const container = document.getElementById("inboxContainer");
+
+        if (!data.messages || data.messages.length === 0) {
+            container.innerHTML = '<div class="empty-inbox">No messages yet 📭</div>';
+            return;
+        }
+
+        container.innerHTML = "";
+
+        data.messages.forEach(msg => {
+            const div = document.createElement("div");
+            div.className = "inbox-message";
+
+            div.innerHTML = `
+                <div class="from">From: ${msg.from_name}</div>
+                <div class="text"></div>
+                <div class="time">${new Date(msg.timestamp).toLocaleString()}</div>
+            `;
+
+            div.querySelector(".text").textContent = msg.message;
+
+            container.appendChild(div);
+        });
+    })
+    .catch(err => {
+        document.getElementById("inboxContainer").innerHTML =
+            '<div class="empty-inbox">Error loading messages</div>';
+    });
+}
+
+function showPopupMessage(text) {
+    document.getElementById("popup-text").innerText = text;
+    document.getElementById("popup").style.display = "flex";
+}
+
+function closePopup() {
+    document.getElementById("popup").style.display = "none";
+}
+    </script>
+
+</body>
+
+</html>
