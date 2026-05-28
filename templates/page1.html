@@ -25,7 +25,8 @@
             width: 100%;
         }
 
-        .join-section {
+        /* CHANGED: Swapped join-section for login-section */
+        .login-section {
             display: block;
         }
 
@@ -62,17 +63,27 @@
             gap: 15px;
         }
 
+        .form-group {
+            width: 100%;
+            max-width: 300px;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
         label {
-            font-size: 1.1rem;
+            font-size: 1rem;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
 
+        /* CHANGED: Targets all input text types uniformly */
         input[type="text"],
+        input[type="password"],
         textarea {
             padding: 10px;
             width: 100%;
-            max-width: 300px;
             border: none;
             border-radius: 4px;
             font-size: 1rem;
@@ -195,22 +206,29 @@
 
     <div class="container">
 
-        <!-- JOIN SECTION -->
-        <div class="join-section" id="joinSection">
+        <div class="login-section" id="loginSection">
             <div class="image-container">
                 <img src="{{ url_for('static', filename='bc.JPG') }}" alt="image">
             </div>
 
             <h1>Happy 5th Anniversary!</h1>
+            <h3 style="color: #bbb; margin-bottom: 20px; font-weight: normal;">Please sign in to continue</h3>
 
-            <form onsubmit="submitForm(event)">
-                <label for="user-name">Enter Your Name</label>
-                <input type="text" id="user-name" placeholder="first name only" required>
-                <button type="submit">Submit</button>
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="Enter your username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                </div>
+                
+                <button type="submit" style="margin-top: 10px;">Login</button>
             </form>
         </div>
 
-        <!-- MESSAGE SECTION -->
         <div class="message-section" id="messageSection">
             <h2>Send Your Appreciation! 💝</h2>
 
@@ -234,20 +252,20 @@
             </div>
         </div>
 
-       <!-- INBOX SECTION -->
-<div class="inbox-section" id="inboxSection">
-    <h2>📬 Appreciation Inbox</h2>
+        <div class="inbox-section" id="inboxSection">
+            <h2>📬 Appreciation Inbox</h2>
 
-    <div class="inbox-container" id="inboxContainer">
-        <div class="empty-inbox">Loading messages...</div>
+            <div class="inbox-container" id="inboxContainer">
+                <div class="empty-inbox">Loading messages...</div>
+            </div>
+
+            <button onclick="goBackToMessaging()" style="background-color: #3498db; margin-top: 15px;">
+                ← Back to Send Messages
+            </button>
+        </div>
+
     </div>
 
-    <button onclick="goBackToMessaging()" style="background-color: #3498db; margin-top: 15px;">
-        ← Back to Send Messages
-    </button>
-</div>
-
-    <!-- POPUP -->
     <div id="popup" class="popup">
         <div class="popup-content">
             <p id="popup-text">Loading...</p>
@@ -256,168 +274,179 @@
     </div>
 
     <script>
-     let targetUserId = null;
-let targetUserName = null;
-
-// safe JSON handler
-async function safeJson(res) {
-    const text = await res.text();
-    try {
-        return JSON.parse(text);
-    } catch {
-        throw new Error("Server returned invalid response");
-    }
-}
-
-function submitForm(event) {
-    event.preventDefault();
-
-    const name = document.getElementById("user-name").value.trim();
-
-    if (!name) {
-        showPopupMessage("Please enter your name!");
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append("name", name);
-
-    showPopupMessage("Adding you to the club...");
-
-    fetch("/join", {
-        method: "POST",
-        body: formData
-    })
-    .then(res => safeJson(res))
-    .then(data => {
-        if (data.error) throw new Error(data.error);
-
-        showPopupMessage("Picking someone for you...");
-        return fetch("/random-user");
-    })
-    .then(res => safeJson(res))
-    .then(data => {
-        if (data.error) throw new Error(data.error);
-
-        targetUserId = data.id;
-        targetUserName = data.name;
-
-        document.getElementById("targetName").innerText = targetUserName;
-
-        closePopup();
-        document.getElementById("joinSection").style.display = "none";
-        document.getElementById("messageSection").style.display = "block";
-    })
-    .catch(err => {
-        console.error(err);
-        showPopupMessage("❌ " + err.message);
-    });
-}
-
-function sendAppreciation(event) {
-    event.preventDefault();
-
-    const message = document.getElementById("message").value.trim();
-
-    if (!message) {
-        showPopupMessage("Please write a message!");
-        return;
-    }
-
-    fetch("/send-appreciation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            to_user_id: targetUserId,
-            message: message
-        })
-    })
-    .then(res => safeJson(res))
-    .then(data => {
-        if (data.error) throw new Error(data.error);
-
-        showPopupMessage("✨ Message sent to " + targetUserName + " 💝");
-        document.getElementById("message").value = "";
-    })
-    .catch(err => {
-        showPopupMessage("❌ " + err.message);
-    });
-}
-
-function getNewTarget() {
-    showPopupMessage("Picking another person...");
-
-    fetch("/random-user")
-    .then(res => safeJson(res))
-    .then(data => {
-        if (data.error) throw new Error(data.error);
-
-        targetUserId = data.id;
-        targetUserName = data.name;
-
-        document.getElementById("targetName").innerText = targetUserName;
-        document.getElementById("message").value = "";
-
-        closePopup();
-    })
-    .catch(err => showPopupMessage("❌ " + err.message));
-}
-
-function goToInbox() {
-    document.getElementById("messageSection").style.display = "none";
-    document.getElementById("inboxSection").style.display = "block";
-    loadInbox();
-}
-
-function goBackToMessaging() {
-    document.getElementById("inboxSection").style.display = "none";
-    document.getElementById("messageSection").style.display = "block";
-}
-
-function loadInbox() {
-    fetch("/inbox")
-    .then(res => safeJson(res))
-    .then(data => {
-        const container = document.getElementById("inboxContainer");
-
-        if (!data.messages || data.messages.length === 0) {
-            container.innerHTML = '<div class="empty-inbox">No messages yet 📭</div>';
-            return;
+        let targetUserId = null;
+        let targetUserName = null;
+        let selectionLocked = false;
+        
+        // safe JSON handler
+        async function safeJson(res) {
+            const text = await res.text();
+            try {
+                return JSON.parse(text);
+            } catch {
+                throw new Error("Server returned invalid response");
+            }
         }
-
-        container.innerHTML = "";
-
-        data.messages.forEach(msg => {
-            const div = document.createElement("div");
-            div.className = "inbox-message";
-
-            div.innerHTML = `
-                <div class="from">From: ${msg.from_name}</div>
-                <div class="text"></div>
-                <div class="time">${new Date(msg.timestamp).toLocaleString()}</div>
-            `;
-
-            div.querySelector(".text").textContent = msg.message;
-
-            container.appendChild(div);
-        });
-    })
-    .catch(err => {
-        document.getElementById("inboxContainer").innerHTML =
-            '<div class="empty-inbox">Error loading messages</div>';
-    });
-}
-
-function showPopupMessage(text) {
-    document.getElementById("popup-text").innerText = text;
-    document.getElementById("popup").style.display = "flex";
-}
-
-function closePopup() {
-    document.getElementById("popup").style.display = "none";
-}
+        
+        // CHANGED: Form submission logic rewritten to handle existing accounts
+        function handleLogin(event) {
+            event.preventDefault();
+        
+            const username = document.getElementById("username").value.trim();
+            const password = document.getElementById("password").value;
+        
+            if (!username || !password) {
+                showPopupMessage("Please fill out all fields!");
+                return;
+            }
+        
+            showPopupMessage("Verifying credentials...");
+        
+            // Sending JSON authentication payload to your backend
+            fetch("/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            })
+            .then(res => safeJson(res))
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+        
+                showPopupMessage("Picking someone for you...");
+                return fetch("/random-user");
+            })
+            .then(res => safeJson(res))
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+        
+                targetUserId = data.id;
+                targetUserName = data.name;
+        
+                document.getElementById("targetName").innerText = targetUserName;
+        
+                // 🔒 lock selection after first pick
+                selectionLocked = true;
+        
+                closePopup();
+                document.getElementById("loginSection").style.display = "none";
+                document.getElementById("messageSection").style.display = "block";
+            })
+            .catch(err => {
+                showPopupMessage("❌ " + err.message);
+            });
+        }
+        
+        function sendAppreciation(event) {
+            event.preventDefault();
+        
+            const message = document.getElementById("message").value.trim();
+        
+            if (!message) {
+                showPopupMessage("Please write a message!");
+                return;
+            }
+        
+            fetch("/send-appreciation", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to_user_id: targetUserId,
+                    message: message
+                })
+            })
+            .then(res => safeJson(res))
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+        
+                showPopupMessage("✨ Message sent to " + targetUserName + " 💝");
+                document.getElementById("message").value = "";
+            })
+            .catch(err => {
+                showPopupMessage("❌ " + err.message);
+            });
+        }
+        
+        // 🔥 LOCKED RANDOM (no change allowed)
+        function getNewTarget() {
+            if (selectionLocked) {
+                showPopupMessage("You already have a selected person 💝");
+                return;
+            }
+        
+            showPopupMessage("Picking another person...");
+        
+            fetch("/random-user")
+            .then(res => safeJson(res))
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+        
+                targetUserId = data.id;
+                targetUserName = data.name;
+        
+                document.getElementById("targetName").innerText = targetUserName;
+        
+                closePopup();
+            })
+            .catch(err => showPopupMessage("❌ " + err.message));
+        }
+        
+        function goToInbox() {
+            document.getElementById("messageSection").style.display = "none";
+            document.getElementById("inboxSection").style.display = "block";
+            loadInbox();
+        }
+        
+        function goBackToMessaging() {
+            document.getElementById("inboxSection").style.display = "none";
+            document.getElementById("messageSection").style.display = "block";
+        }
+        
+        function loadInbox() {
+            fetch("/inbox")
+            .then(res => safeJson(res))
+            .then(data => {
+                const container = document.getElementById("inboxContainer");
+        
+                if (!data.messages || data.messages.length === 0) {
+                    container.innerHTML = '<div class="empty-inbox">No messages yet 📭</div>';
+                    return;
+                }
+        
+                container.innerHTML = "";
+        
+                data.messages.forEach(msg => {
+                    const div = document.createElement("div");
+                    div.className = "inbox-message";
+        
+                    div.innerHTML = `
+                        <div class="from">From: ${msg.from_name}</div>
+                        <div class="text"></div>
+                        <div class="time">${new Date(msg.timestamp).toLocaleString()}</div>
+                    `;
+        
+                    div.querySelector(".text").textContent = msg.message;
+        
+                    container.appendChild(div);
+                });
+            })
+            .catch(() => {
+                document.getElementById("inboxContainer").innerHTML =
+                    '<div class="empty-inbox">Error loading messages</div>';
+            });
+        }
+        
+        function showPopupMessage(text) {
+            document.getElementById("popup-text").innerText = text;
+            document.getElementById("popup").style.display = "flex";
+        }
+        
+        function closePopup() {
+            document.getElementById("popup").style.display = "none";
+        }
     </script>
-
 </body>
 
 </html>
