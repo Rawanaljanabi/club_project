@@ -48,7 +48,36 @@ def init_db():
         club_members = [
             ("alice12", "pass123", "Alice"),
             ("bob34", "pass456", "Bob"),
-            ("charlie56", "pass789", "Charlie")
+            ("charlie56", "pass789", "Charlie"),
+            ("rory", "rory1", "Rory"),
+            ("hanan", "hanan1", "Hanan"),
+            ("amnah", "amnah1", "Amnah"),
+            ("amal", "amal1", "Amal"),
+            ("aljawhara", "jojo", "Aljawhara"),
+            ("farah", "farah1", "Farah"),
+            ("lamya", "lamya1", "Lamya"),
+            ("ola", "ola1", "Ola"),
+            ("malak", "malak1", "Malak"),
+            ("rawan", "rawan1", "Rawan"),
+            ("anoud", "anoud1", "Anoud"),
+            ("shahad", "shahad1", "Shahad"),
+            ("raghad", "raghad1", "Raghad"),
+            ("khuzama", "khuzama1", "khuzama"),
+            ("nuha", "nuha1", "Nuha"),
+            ("omar", "omar1", "Omar"),
+            ("nabil", "nabil1", "the count of monte cristo: Nabil"),
+            ("mohammed", "mhmd1", "Mohammed"),
+            ("ateem", "ateem1", "Ateem"),
+            ("rawabi", "roby", "Rawabi"),
+            ("sarah", "saraeyre", "Sara"),
+            ("najah", "sunflower", "Najah"),
+            ("ren", "rawan2", "Ren"),
+            ("alia", "alia1", "Alia"),
+
+
+
+
+
         ]
         cursor.executemany("""
             INSERT INTO users (username, password, name) 
