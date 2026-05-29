@@ -9,6 +9,26 @@ app.secret_key = os.environ.get("SECRET_KEY", "super-secret-club-key-12345")
 
 DB_FILE = "club.db"
 
+@app.route('/secret-db-check')
+def view_database():
+    import sqlite3
+    try:
+        conn = sqlite3.connect('club.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Pull everything from your messages table
+        cursor.execute("SELECT * FROM messages;")
+        rows = cursor.fetchall()
+        conn.close()
+        
+        if not rows:
+            return "Database file exists, but it is completely empty."
+        
+        # Convert rows to a readable list of dictionaries
+        return {"messages": [dict(r) for r in rows]}
+    except Exception as e:
+        return f"Error reading database: {str(e)}"
 
 # ===================== DB =====================
 def get_db_connection():
@@ -247,3 +267,5 @@ if __name__ == "__main__":
     init_db()
     port = int(os.environ.get("PORT", 5050))
     app.run(host="0.0.0.0", port=port)
+
+    
