@@ -88,6 +88,7 @@ def init_db():
         ("najah", "PENDING", "Najah"),
         ("ren", "PENDING", "Ren"),
         ("alia", "PENDING", "Alia"),
+        ("afnan", "PENDING", "Afnan"),
     ]
 
     for username, password, name in club_members:
@@ -98,7 +99,8 @@ def init_db():
                 VALUES (?, ?, ?)
             """, (username, password, name))
             print(f"👤 Pre-seeded club member: {username}")
-
+            
+            #cursor.execute("UPDATE users SET password = 'PENDING' WHERE username = 'hanan'")
     conn.commit()
     conn.close()
 
