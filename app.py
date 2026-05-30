@@ -260,12 +260,7 @@ def inbox():
 
 # ===================== RUN =====================
 if __name__ == "__main__":
-    # TEMPORARY: This forces Render to delete the old database file on boot
-    if os.path.exists(DB_FILE):
-        os.remove(DB_FILE)
-        
     init_db()
     port = int(os.environ.get("PORT", 5050))
     app.run(host="0.0.0.0", port=port)
-
     
