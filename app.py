@@ -11,7 +11,6 @@ DB_FILE = "club.db"
 
 @app.route('/secret-db-check')
 def view_database():
-    import sqlite3
     try:
         conn = sqlite3.connect('club.db')
         conn.row_factory = sqlite3.Row
@@ -29,7 +28,7 @@ def view_database():
         return {"messages": [dict(r) for r in rows]}
     except Exception as e:
         return f"Error reading database: {str(e)}"
-
+    
 # ===================== DB =====================
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -41,7 +40,6 @@ def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
-    # 1. Create tables
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,49 +59,45 @@ def init_db():
         )
     """)
 
-    # 2. SEED USERS AUTOMATICALLY
-    # Check if the table is empty first
-    cursor.execute("SELECT COUNT(*) FROM users")
-    if cursor.fetchone()[0] == 0:
-        club_members = [
-            ("alice12", "pass123", "Alice"),
-            ("bob34", "pass456", "Bob"),
-            ("charlie56", "pass789", "Charlie"),
-            ("rory", "rory1", "Rory"),
-            ("hanan", "hanan1", "Hanan"),
-            ("amnah", "amnah1", "Amnah"),
-            ("amal", "amal1", "Amal"),
-            ("aljawhara", "jojo", "Aljawhara"),
-            ("farah", "farah1", "Farah"),
-            ("lamya", "lamya1", "Lamya"),
-            ("ola", "ola1", "Ola"),
-            ("malak", "malak1", "Malak"),
-            ("rawan", "rawan1", "Rawan"),
-            ("anoud", "anoud1", "Anoud"),
-            ("shahad", "shahad1", "Shahad"),
-            ("raghad", "raghad1", "Raghad"),
-            ("khuzama", "khuzama1", "khuzama"),
-            ("nuha", "nuha1", "Nuha"),
-            ("omar", "omar1", "Omar"),
-            ("nabil", "nabil1", "the count of monte cristo: Nabil"),
-            ("mohammed", "mhmd1", "Mohammed"),
-            ("ateem", "ateem1", "Ateem"),
-            ("rawabi", "roby", "Rawabi"),
-            ("sarah", "saraeyre", "Sara"),
-            ("najah", "sunflower", "Najah"),
-            ("ren", "rawan2", "Ren"),
-            ("alia", "alia1", "Alia"),
+    # 2. SMART SEEDING: Notice the passwords are all set to "PENDING"
+    club_members = [
+        ("alice12", "PENDING", "Alice"),
+        ("bob34", "PENDING", "Bob"),
+        ("charlie56", "PENDING", "Charlie"),
+        ("rory", "PENDING", "Rory"),
+        ("hanan", "PENDING", "Hanan"),
+        ("amnah", "PENDING", "Amnah"),
+        ("amal", "PENDING", "Amal"),
+        ("aljawhara", "PENDING", "Aljawhara"),
+        ("farah", "PENDING", "Farah"),
+        ("lamya", "PENDING", "Lamya"),
+        ("ola", "PENDING", "Ola"),
+        ("malak", "PENDING", "Malak"),
+        ("rawan", "PENDING", "Rawan"),
+        ("anoud", "PENDING", "Anoud"),
+        ("shahad", "PENDING", "Shahad"),
+        ("raghad", "PENDING", "Raghad"),
+        ("khuzama", "PENDING", "khuzama"),
+        ("nuha", "PENDING", "Nuha"),
+        ("omar", "PENDING", "Omar"),
+        ("nabil", "PENDING", "the count of monte cristo: Nabil"),
+        ("mohammed", "PENDING", "Mohammed"),
+        ("ateem", "PENDING", "Ateem"),
+        ("rawabi", "PENDING", "Rawabi"),
+        ("sarah", "PENDING", "Sara"),
+        ("najah", "PENDING", "Najah"),
+        ("ren", "PENDING", "Ren"),
+        ("alia", "PENDING", "Alia"),
+    ]
 
-
-
-
-
-        ]
-        cursor.executemany("""
-            INSERT INTO users (username, password, name) 
-            VALUES (?, ?, ?)
-        """, club_members)
-        print("✨ Database automatically seeded with club members!")
+    for username, password, name in club_members:
+        cursor.execute("SELECT 1 FROM users WHERE username = ?", (username,))
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT INTO users (username, password, name) 
+                VALUES (?, ?, ?)
+            """, (username, password, name))
+            print(f"👤 Pre-seeded club member: {username}")
 
     conn.commit()
     conn.close()
@@ -115,12 +109,12 @@ def home():
     return render_template("page1.html")
 
 
-# ---- Replaced /join with /login ----
+# ---- Smart Login & First-Time Password Setter ----
 @app.route("/login", methods=["POST"])
 def login():
     try:
         data = request.get_json() or {}
-        username = data.get("username", "").strip()
+        username = data.get("username", "").strip().lower()
         password = data.get("password", "")
 
         if not username or not password:
@@ -129,26 +123,41 @@ def login():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Search for the pre-configured admin user accounts
-        cursor.execute(
-            "SELECT id, username, name FROM users WHERE username = ? AND password = ?",
-            (username, password)
-        )
+        # Look up the user by username first to see if they are on your hardcoded list
+        cursor.execute("SELECT id, username, password, name FROM users WHERE username = ?", (username,))
         user = cursor.fetchone()
-        conn.close()
 
-        if user:
-            # Store the logged-in user details inside the encrypted session cookie
+        if not user:
+            conn.close()
+            return jsonify({"error": "You are not registered as an authorized club member! ❌"}), 401
+
+        # CASE A: First time logging in! Set their typed password as permanent
+        if user["password"] == "PENDING":
+            cursor.execute(
+                "UPDATE users SET password = ? WHERE id = ?",
+                (password, user["id"])
+            )
+            conn.commit()
+            
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["name"] = user["name"]
+            conn.close()
+            return jsonify({"success": True, "message": f"Welcome first timer! Your custom password has been saved! 🔒"})
+
+        # CASE B: Returning user! Verify their password matches what they chose previously
+        if user["password"] == password:
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
+            session["name"] = user["name"]
+            conn.close()
             return jsonify({"success": True, "message": f"Welcome back, {user['name']}!"})
         else:
-            return jsonify({"error": "Invalid username or password"}), 401
+            conn.close()
+            return jsonify({"error": "Incorrect password for this club member!"}), 401
 
     except Exception as e:
         return jsonify({"error": f"Login backend error: {str(e)}"}), 500
-
 
 # ---- Random user (FIXED & ROBUST) ----
 @app.route("/random-user")
@@ -263,4 +272,3 @@ if __name__ == "__main__":
     init_db()
     port = int(os.environ.get("PORT", 5050))
     app.run(host="0.0.0.0", port=port)
-    
