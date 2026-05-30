@@ -1,48 +1,30 @@
 from flask import Flask, request, render_template, jsonify, session
-import sqlite3
+import psycopg2
+from psycopg2.extras import DictCursor
 import random
 import os
 
 app = Flask(__name__)
 # CRITICAL: Set a secret key to enable secure user sessions
-app.secret_key = os.environ.get("SECRET_KEY", "super-secret-club-key-12345")
+app.secret_key = os.environ.get("SECRET_KEY", "Rwn910-@")
 
-DB_FILE = "club.db"
+# 🔗 PASTE YOUR INTERNAL DATABASE URL HERE:
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://club_db_ntx0_user:sV6sDCBPCiCRc7GYmwh9H2W7SPs1nvrF@dpg-d8deehuk1jcs738trdd0-a/club_db_ntx0")
 
-@app.route('/secret-db-check')
-def view_database():
-    try:
-        conn = sqlite3.connect('club.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        # Pull everything from your messages table
-        cursor.execute("SELECT * FROM messages;")
-        rows = cursor.fetchall()
-        conn.close()
-        
-        if not rows:
-            return "Database file exists, but it is completely empty."
-        
-        # Convert rows to a readable list of dictionaries
-        return {"messages": [dict(r) for r in rows]}
-    except Exception as e:
-        return f"Error reading database: {str(e)}"
-    
-# ===================== DB =====================
+# ===================== DB MANAGEMENT =====================
 def get_db_connection():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
+    # Connects to your permanent, cloud Postgres database
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=DictCursor)
     return conn
 
-
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
 
+    # 1. Create tables safely (Postgres uses SERIAL instead of AUTOINCREMENT)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             name TEXT NOT NULL
@@ -51,15 +33,15 @@ def init_db():
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             from_user_id INTEGER NOT NULL,
             to_user_id INTEGER NOT NULL,
             message TEXT NOT NULL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
-    # 2. SMART SEEDING: Notice the passwords are all set to "PENDING"
+    # 2. SMART SEEDING: Club members passwords default to PENDING
     club_members = [
         ("alice12", "PENDING", "Alice"),
         ("bob34", "PENDING", "Bob"),
@@ -92,24 +74,42 @@ def init_db():
     ]
 
     for username, password, name in club_members:
-        cursor.execute("SELECT 1 FROM users WHERE username = ?", (username,))
+        # Check if the member already exists using Postgres %s placeholder syntax
+        cursor.execute("SELECT 1 FROM users WHERE username = %s", (username,))
         if not cursor.fetchone():
             cursor.execute("""
                 INSERT INTO users (username, password, name) 
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
             """, (username, password, name))
             print(f"👤 Pre-seeded club member: {username}")
-            
-            #cursor.execute("UPDATE users SET password = 'PENDING' WHERE username = 'hanan'")
+
     conn.commit()
+    cursor.close()
     conn.close()
 
+@app.route('/secret-db-check')
+def view_database():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Pull everything from your live cloud messages table
+        cursor.execute("SELECT * FROM messages;")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        if not rows:
+            return "Database file exists, but it is completely empty."
+        
+        return {"messages": [dict(r) for r in rows]}
+    except Exception as e:
+        return f"Error reading database: {str(e)}"
 
 # ===================== ROUTES =====================
 @app.route("/")
 def home():
     return render_template("page1.html")
-
 
 # ---- Smart Login & First-Time Password Setter ----
 @app.route("/login", methods=["POST"])
@@ -125,18 +125,18 @@ def login():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Look up the user by username first to see if they are on your hardcoded list
-        cursor.execute("SELECT id, username, password, name FROM users WHERE username = ?", (username,))
+        cursor.execute("SELECT id, username, password, name FROM users WHERE username = %s", (username,))
         user = cursor.fetchone()
 
         if not user:
+            cursor.close()
             conn.close()
             return jsonify({"error": "You are not registered as an authorized club member! ❌"}), 401
 
-        # CASE A: First time logging in! Set their typed password as permanent
+        # CASE A: First time logging in! Lock in their chosen password
         if user["password"] == "PENDING":
             cursor.execute(
-                "UPDATE users SET password = ? WHERE id = ?",
+                "UPDATE users SET password = %s WHERE id = %s",
                 (password, user["id"])
             )
             conn.commit()
@@ -144,28 +144,30 @@ def login():
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["name"] = user["name"]
+            cursor.close()
             conn.close()
             return jsonify({"success": True, "message": f"Welcome first timer! Your custom password has been saved! 🔒"})
 
-        # CASE B: Returning user! Verify their password matches what they chose previously
+        # CASE B: Returning user validation
         if user["password"] == password:
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["name"] = user["name"]
+            cursor.close()
             conn.close()
             return jsonify({"success": True, "message": f"Welcome back, {user['name']}!"})
         else:
+            cursor.close()
             conn.close()
             return jsonify({"error": "Incorrect password for this club member!"}), 401
 
     except Exception as e:
         return jsonify({"error": f"Login backend error: {str(e)}"}), 500
 
-# ---- Random user (FIXED & ROBUST) ----
+# ---- Random user ----
 @app.route("/random-user")
 def random_user():
     try:
-        # Check if the current user is logged in
         current_user_id = session.get("user_id")
         if not current_user_id:
             return jsonify({"error": "Unauthorized. Please log in first."}), 401
@@ -173,20 +175,17 @@ def random_user():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Grab random users EXCLUDING the logged-in user themselves
-        cursor.execute("SELECT id, name FROM users WHERE id != ?", (current_user_id,))
+        cursor.execute("SELECT id, name FROM users WHERE id != %s", (current_user_id,))
         rows = cursor.fetchall()
+        cursor.close()
         conn.close()
 
-        # SAFE CONVERSION: Turn sqlite3.Row objects into standard Python dictionaries
         users_list = [{"id": row["id"], "name": row["name"]} for row in rows]
 
         if len(users_list) == 0:
             return jsonify({"error": "No other users available to select"}), 400
 
-        # Safely pick from a clean dictionary list
         chosen = random.choice(users_list)
-
         return jsonify({
             "success": True,
             "id": chosen["id"],
@@ -195,7 +194,6 @@ def random_user():
 
     except Exception as e:
         return jsonify({"error": f"Randomizer backend error: {str(e)}"}), 500
-
 
 # ---- Send message ----
 @app.route("/send-appreciation", methods=["POST"])
@@ -209,28 +207,25 @@ def send_appreciation():
         to_user_id = data.get("to_user_id")
         message = data.get("message", "").strip()
 
-        if not to_user_id:
-            return jsonify({"error": "Missing recipient user"}), 400
-
-        if not message:
-            return jsonify({"error": "Empty message"}), 400
+        if not to_user_id or not message:
+            return jsonify({"error": "Missing recipient or empty message"}), 400
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute(
-            "INSERT INTO messages (from_user_id, to_user_id, message) VALUES (?, ?, ?)",
+            "INSERT INTO messages (from_user_id, to_user_id, message) VALUES (%s, %s, %s)",
             (current_user_id, to_user_id, message)
         )
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return jsonify({"success": True})
 
     except Exception as e:
         return jsonify({"error": f"Send backend error: {str(e)}"}), 500
-
 
 # ---- Secure Personal Inbox ----
 @app.route("/inbox")
@@ -247,11 +242,12 @@ def inbox():
             SELECT u.name AS from_name, m.message, m.timestamp
             FROM messages m
             JOIN users u ON m.from_user_id = u.id
-            WHERE m.to_user_id = ?
+            WHERE m.to_user_id = %s
             ORDER BY m.timestamp DESC
         """, (current_user_id,))
 
         messages = cursor.fetchall()
+        cursor.close()
         conn.close()
 
         return jsonify({
@@ -259,7 +255,7 @@ def inbox():
                 {
                     "from_name": m["from_name"],
                     "message": m["message"],
-                    "timestamp": m["timestamp"]
+                    "timestamp": m["timestamp"].isoformat() if m["timestamp"] else None
                 }
                 for m in messages
             ]
@@ -267,7 +263,6 @@ def inbox():
 
     except Exception as e:
         return jsonify({"error": f"Inbox backend error: {str(e)}"}), 500
-
 
 # ===================== RUN =====================
 if __name__ == "__main__":
