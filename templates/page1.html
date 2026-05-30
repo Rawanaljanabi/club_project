@@ -369,29 +369,26 @@
             });
         }
         
-        // 🔥 LOCKED RANDOM (no change allowed)
-        function getNewTarget() {
-            if (selectionLocked) {
-                showPopupMessage("You already have a selected person 💝");
-                return;
-            }
-        
-            showPopupMessage("Picking another person...");
-        
-            fetch("/random-user")
-            .then(res => safeJson(res))
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-        
-                targetUserId = data.id;
-                targetUserName = data.name;
-        
-                document.getElementById("targetName").innerText = targetUserName;
-        
-                closePopup();
-            })
-            .catch(err => showPopupMessage("❌ " + err.message));
-        }
+        // 🔓 UNLOCKED RANDOM (Change allowed!)
+function getNewTarget() {
+    // We removed the 'if (selectionLocked)' check so users can spin as many times as they want!
+
+    showPopupMessage("Picking another person...");
+
+    fetch("/random-user")
+    .then(res => safeJson(res))
+    .then(data => {
+        if (data.error) throw new Error(data.error);
+
+        targetUserId = data.id;
+        targetUserName = data.name;
+
+        document.getElementById("targetName").innerText = targetUserName;
+
+        closePopup();
+    })
+    .catch(err => showPopupMessage("❌ " + err.message));
+}
         
         function goToInbox() {
             document.getElementById("messageSection").style.display = "none";
